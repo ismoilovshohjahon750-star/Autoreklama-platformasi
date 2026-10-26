@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Autoreklama Platformasi"
+description = "Reklama beruvchilar va publisherlar uchun reklama kampaniyalarini, joylashuvlarni, tasdiqlangan kliklarni va daromad taqsimotini boshqaruvchi platforma."
+version = "1.0.0"
+id = "artifacts/autoreklama"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18746
+
+[services.development]
+run = "pnpm --filter @workspace/autoreklama run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/autoreklama", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/autoreklama/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18746"
+BASE_PATH = "/"

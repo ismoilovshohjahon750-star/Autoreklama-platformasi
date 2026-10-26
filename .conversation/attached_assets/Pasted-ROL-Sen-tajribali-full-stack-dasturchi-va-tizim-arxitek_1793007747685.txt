@@ -1,0 +1,137 @@
+ROL: Sen tajribali full-stack dasturchi va tizim arxitektorisan. Quyidagi talablar asosida 
+"Autoreklama platformasi" nomli to‘liq ishlaydigan mahsulotni ishlab chiqishing kerak.
+
+====================================================
+1. LOYIHA MAQSADI
+====================================================
+Reklama beruvchilar o‘z reklamalarini quyidagi kanallar orqali tarqatadigan yagona platforma:
+- Veb-saytlar (Web SDK orqali)
+- Android ilovalar (Android SDK orqali)
+- Ruxsat berilgan Telegram botlari va kanal/guruhlar
+
+Foydalanuvchilar saytda ro‘yxatdan o‘tadi, loyiha yaratadi, reklama kampaniyalarini boshqaradi 
+va real vaqtda statistikani kuzatadi.
+
+====================================================
+2. ASOSIY BIZNES QOIDALARI
+====================================================
+- Reklama beruvchi har bir reklama uchun OYLIK to‘lov qiladi (bu kampaniyaning faolligini belgilaydi).
+- Hamkorlarga (publisher) to‘lov FAQAT tizim tomonidan tekshirilib, tasdiqlangan haqiqiy kliklar uchun amalga oshiriladi.
+- Ko‘rishlar (impressions) statistika uchun alohida sanaladi, lekin o‘z-o‘zidan daromad keltirmaydi.
+- Daromad taqsimoti: tasdiqlangan har bir klik qiymatining 25% hamkorga, 75% platformaga ajratiladi 
+  (bu ulush — hosting, to‘lov provayderi komissiyasi va soliqlardan OLDINGI taqsimot).
+- Har bir reklamaning o‘z oylik davri va holati (active/paused/expired) bo‘ladi.
+- Ishlatilmagan byudjetni qaytarish yoki keyingi davrga o‘tkazish qoidasi sozlanuvchan bo‘lishi kerak.
+
+HISOB-KITOB NAMUNASI (shu mantiqni tizimga qattiq kodlab qo‘ymasdan, sozlanuvchan parametr sifatida yarat):
+- Oylik reklama to‘lovi: $20.00 (misol, admin tomonidan o‘zgartiriladi)
+- Har bir tasdiqlangan klik narxi: $0.10 (misol, admin tomonidan o‘zgartiriladi)
+- Shu holatda $20 byudjet = maksimal 200 ta tasdiqlangan klik
+- Hamkor ulushi: $0.025/klik (25%)
+- Platforma ulushi: $0.075/klik (75%)
+- Byudjet tugaganda kampaniya avtomatik to‘xtatilishi kerak.
+
+====================================================
+3. KLIKLARNI TEKSHIRISH VA FIRIBGARLIKDAN HIMOYA
+====================================================
+Quyidagi mantiqni backend darajasida amalga oshir:
+- Bir xil klikni (bir xil foydalanuvchi/IP/qurilma) takroran hisoblashni oldini olish (deduplication).
+- Bot, avtomatik trafik va shubhali takroriy kliklarni aniqlovchi filtr/qoida tizimi.
+- Har bir klikni kampaniya, reklama va hamkor joylashuvi (placement) bilan bog‘lab saqlash.
+- Daromad faqat "tasdiqlangan" (verified) klik holatiga o‘tgandan so‘ng yozilishi kerak 
+  (klik holatlari: pending → verified → rejected).
+- Ko‘rishlar va kliklar statistikasini bazada ALOHIDA jadvallarda yuritish.
+
+====================================================
+4. PLATFORMA ARXITEKTURASI (MODULLAR)
+====================================================
+1) Veb-sayt + boshqaruv paneli (dashboard)
+   - Ro‘yxatdan o‘tish/login, loyiha yaratish, reklama yaratish/tahrirlash, to‘lovlar, statistika grafiklari.
+2) Backend API
+   - Reklamalarni tarqatish, kliklarni qabul qilish va tekshirish, daromadni hisoblash, 
+     foydalanuvchi va hamkor ruxsatlarini boshqarish.
+3) Telegram integratsiyasi
+   - Bot javoblari yoki hamkor ruxsat bergan kanal/guruhlarda reklama chiqarish.
+4) Web SDK
+   - Hamkor saytlarida reklama blokini ko‘rsatish va klikni backend’ga yuborish uchun JS kutubxona.
+5) Android SDK
+   - Android ilovalarga reklama integratsiyasi uchun Kotlin kutubxona.
+6) Admin panel
+   - Reklamalarni moderatsiya qilish, tariflarni (oylik to‘lov, klik narxi, 25/75 ulush) boshqarish, 
+     firibgar hisoblarni bloklash.
+
+====================================================
+5. TAVSIYA ETILGAN TEXNOLOGIYALAR
+====================================================
+- Backend: Python + FastAPI
+- Ma’lumotlar bazasi: PostgreSQL
+- Fon vazifalari (navbat): Redis + Celery
+- Veb-panel: React + TypeScript
+- Telegram bot: Python + aiogram
+- Android SDK: Kotlin
+- Joylashtirish (deploy): Render yoki shunga o‘xshash hosting
+- Media fayllar (rasm/video): S3-mos obyekt ombori (masalan, MinIO yoki AWS S3)
+
+====================================================
+6. MA'LUMOTLAR BAZASI UCHUN TAXMINIY ASOSIY MODELLAR
+====================================================
+- users (id, email, role: advertiser/publisher/admin, balans, status)
+- projects (id, user_id, nomi, holati)
+- campaigns (id, project_id, oylik_tolov, klik_narxi, byudjet, boshlanish/tugash_sanasi, holati)
+- ad_creatives (id, campaign_id, media_url, matn, holati — moderatsiyadan o‘tgan/o‘tmagan)
+- placements (id, publisher_id, turi: web/android/telegram, manzil/kanal, ruxsat_holati)
+- clicks (id, campaign_id, placement_id, ip_hash, device_fingerprint, holati: pending/verified/rejected, vaqt)
+- impressions (id, campaign_id, placement_id, vaqt)
+- payouts (id, publisher_id, summa, davr, holati)
+- transactions (id, user_id, turi, summa, sana)
+
+====================================================
+7. XAVFSIZLIK TALABLARI
+====================================================
+- Barcha aloqalar faqat HTTPS orqali.
+- Foydalanuvchi rollariga asoslangan ruxsat tizimi (RBAC).
+- Ochiq SDK kalitlari (public key) va maxfiy server tokenlarini (secret key) ANIQ ajratish — 
+  maxfiy kalitlarni hech qachon APK yoki brauzer kodiga joylashtirmaslik.
+- API so‘rovlariga rate limiting qo‘yish.
+- Audit jurnali (kim, qachon, nima qildi) yuritish.
+- Muntazam zaxira nusxalash (backup) tizimi.
+- Hamkorlar faqat o‘zlari ruxsat bergan joylashuvlarda reklama tarqatishi mumkinligini tekshirish.
+- Reklama mazmunini moderatsiya qilish mexanizmi.
+
+====================================================
+8. ISHLAB CHIQISH BOSQICHLARI
+====================================================
+BOSQICH 1 (MVP):
+- Foydalanuvchi ro‘yxatdan o‘tishi, login, loyiha va reklama yaratish
+- Oddiy Web SDK orqali reklama ko‘rsatish va klikni qayd etish
+- Klikni tasdiqlash (asosiy dublikat tekshiruvi bilan)
+- Daromad hisoblash va 25/75 taqsimot
+- Oddiy admin panel (moderatsiya + tariflarni boshqarish)
+
+BOSQICH 2 (Kengaytirish):
+- Telegram bot integratsiyasi
+- Android SDK
+- Kengaytirilgan firibgarlikka qarshi tizim (bot aniqlash, shubhali trafik filtri)
+- To‘lov tizimi integratsiyasi (payout avtomatlashtirish)
+- Statistika va hisobotlar paneli (grafiklar bilan)
+
+BOSQICH 3 (Masshtablashtirish):
+- Yuqori yuklama uchun optimallashtirish
+- A/B testlash, targeting imkoniyatlari
+- Ko‘p valyuta/mintaqa qo‘llab-quvvatlash
+
+====================================================
+9. KUTILAYOTGAN NATIJA
+====================================================
+- To‘liq backend kodi (FastAPI), migratsiyalar (Alembic) bilan
+- React + TypeScript frontend (dashboard)
+- Telegram bot kodi (aiogram)
+- Web SDK (JS) namunasi
+- Android SDK (Kotlin) namunasi
+- API hujjatlari (Swagger/OpenAPI avtomatik generatsiya)
+- README: o‘rnatish, sozlash (.env namunasi), ishga tushirish bo‘yicha qo‘llanma
+- Asosiy funksiyalar uchun testlar (ayniqsa klik tasdiqlash va daromad hisoblash mantig‘i)
+
+Eslatma: Yakuniy tariflar, qaytarish siyosati va hamkorlarga to‘lov jadvali — bular ishga 
+tushirishdan oldin aniqlashtiriladigan, admin panelda sozlanadigan qiymatlar bo‘lishi kerak, 
+kodga qattiq yozib qo‘yilmasligi lozim.
